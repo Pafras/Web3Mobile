@@ -1,0 +1,10 @@
+# Secrets — never commit
+**/Config/Secrets.swift
+Config.xcconfig
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.DS_Store
