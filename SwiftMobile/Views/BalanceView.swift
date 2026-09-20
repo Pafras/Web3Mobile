@@ -22,7 +22,7 @@ struct BalanceView: View {
                     .disabled(!viewModel.isAddressValid)
                 }
 
-                Section("Sepolia") {
+                Section("ETH") {
                     switch viewModel.state {
                     case .idle:
                         Text("Tap Fetch to read the chain.")
@@ -37,6 +37,22 @@ struct BalanceView: View {
                     case .failed(let message):
                         Label(message, systemImage: "xmark.octagon")
                             .foregroundStyle(.red)
+                    }
+                }
+
+                if case .loaded(let chain) = viewModel.state {
+                    Section("Tokens") {
+                        ForEach(chain.tokens) { balance in
+                            LabeledContent(balance.token.symbol) {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(format(balance.amount))
+                                        .font(.system(.body, design: .monospaced))
+                                    Text("\(format(balance.raw)) raw · \(balance.decimals) decimals")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
                     }
                 }
             }

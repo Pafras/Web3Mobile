@@ -92,6 +92,32 @@ struct RPCClient {
         return try EthUnits.wei(fromHex: hex)
     }
 
+    /// Runs a contract function and returns its raw output, without creating a
+    /// transaction: nothing is mined, no gas is paid, no wallet is involved.
+    func ethCall(to contract: String, data: String) async throws -> String {
+        let checked = try EthUnits.validateAddress(contract)
+        return try await call("eth_call", params: [
+            ["to": checked, "data": data],
+            "latest",
+        ])
+    }
+
+    /// Reads one ERC-20 balance. `decimals` comes from the contract too, since
+    /// it varies per token (USDC 6, LINK 18).
+    func tokenBalance(of token: Token, owner: String) async throws -> TokenBalance {
+        let calldata = try ABI.encodeAddressCall(
+            selector: ABI.balanceOfSelector,
+            address: owner
+        )
+        async let rawHex = ethCall(to: token.address, data: calldata)
+        async let decimalsHex = ethCall(to: token.address, data: ABI.decimalsSelector)
+        return TokenBalance(
+            token: token,
+            raw: try ABI.decodeUInt(await rawHex),
+            decimals: try ABI.decodeDecimals(await decimalsHex)
+        )
+    }
+
     func blockNumber() async throws -> Decimal {
         try await EthUnits.wei(fromHex: call("eth_blockNumber"))
     }

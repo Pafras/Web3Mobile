@@ -17,6 +17,7 @@ final class BalanceViewModel {
         let balanceWei: Decimal
         let blockNumber: Decimal
         let gasPriceWei: Decimal
+        let tokens: [TokenBalance]
 
         var balanceEth: Decimal { EthUnits.eth(fromWei: balanceWei) }
     }
@@ -57,13 +58,35 @@ final class BalanceViewModel {
             async let balance = client.balance(of: address)
             async let block = client.blockNumber()
             async let gas = client.gasPrice()
+            async let tokens = Self.tokenBalances(client: client, owner: address)
             state = .loaded(Chain(
                 balanceWei: try await balance,
                 blockNumber: try await block,
-                gasPriceWei: try await gas
+                gasPriceWei: try await gas,
+                tokens: try await tokens
             ))
         } catch {
             state = .failed(Self.describe(error))
+        }
+    }
+
+    /// One task per token rather than a loop, so three tokens cost one round
+    /// trip instead of three.
+    /// ponytail: one failing token fails the whole fetch — split it per token
+    /// if the list ever grows past a handful.
+    private static func tokenBalances(
+        client: RPCClient,
+        owner: String
+    ) async throws -> [TokenBalance] {
+        try await withThrowingTaskGroup(of: TokenBalance.self) { group in
+            for token in Token.sepolia {
+                group.addTask { try await client.tokenBalance(of: token, owner: owner) }
+            }
+            var balances: [TokenBalance] = []
+            for try await balance in group {
+                balances.append(balance)
+            }
+            return balances.sorted { $0.token.symbol < $1.token.symbol }
         }
     }
 
@@ -83,6 +106,10 @@ final class BalanceViewModel {
             actual == 1
                 ? "That RPC URL points at Ethereum MAINNET (real funds). Use a Sepolia endpoint."
                 : "Wrong network: chain id \(actual). Expected Sepolia (11155111)."
+        case ABIError.unexpectedReturnLength:
+            "That address is not an ERC-20 contract."
+        case ABIError.decimalsOutOfRange(let value):
+            "Contract reported an implausible decimals value (\(value))."
         case let urlError as URLError:
             "Network problem: \(urlError.localizedDescription)"
         default:

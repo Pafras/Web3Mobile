@@ -117,3 +117,91 @@ struct ChainTests {
         }
     }
 }
+
+@Suite("ABI encoding")
+struct ABIEncodingTests {
+
+    static let owner = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+
+    @Test("balanceOf calldata is 4 selector bytes plus one 32-byte slot")
+    func calldataLayout() throws {
+        let data = try ABI.encodeAddressCall(selector: ABI.balanceOfSelector, address: Self.owner)
+        #expect(data.hasPrefix("0x70a08231"))
+        #expect((data.count - 2) / 2 == 36)
+    }
+
+    @Test("The address is right-aligned in its slot")
+    func padding() throws {
+        let data = try ABI.encodeAddressCall(selector: ABI.balanceOfSelector, address: Self.owner)
+        let argument = data.dropFirst(10)                      // past "0x" + selector
+        #expect(argument.prefix(24) == String(repeating: "0", count: 24))
+        #expect(argument.suffix(40) == Self.owner.dropFirst(2))
+    }
+
+    @Test("A malformed address never reaches the network")
+    func rejectsBadAddress() {
+        #expect(throws: EthUnitsError.invalidAddress("0xnope")) {
+            try ABI.encodeAddressCall(selector: ABI.balanceOfSelector, address: "0xnope")
+        }
+    }
+}
+
+@Suite("ABI decoding")
+struct ABIDecodingTests {
+
+    static func slot(_ value: String) -> String {
+        "0x" + String(repeating: "0", count: 64 - value.count) + value
+    }
+
+    @Test("Decodes a full 32-byte word")
+    func decodesUInt() throws {
+        #expect(try ABI.decodeUInt(Self.slot("06")) == 6)
+        #expect(try ABI.decodeUInt(Self.slot("3a35a2aee413f0a88")) == Decimal(string: "67111000000000101000")!)
+    }
+
+    @Test("Rejects a short return value rather than guessing")
+    func rejectsShortData() {
+        // A call to an address holding no contract returns "0x".
+        #expect(throws: ABIError.unexpectedReturnLength("0x")) {
+            try ABI.decodeUInt("0x")
+        }
+    }
+
+    @Test("Decodes decimals for tokens that disagree")
+    func decodesDecimals() throws {
+        #expect(try ABI.decodeDecimals(Self.slot("06")) == 6)   // USDC
+        #expect(try ABI.decodeDecimals(Self.slot("12")) == 18)  // LINK, 0x12
+    }
+
+    @Test("Rejects an implausible decimals value")
+    func rejectsWildDecimals() {
+        #expect(throws: ABIError.decimalsOutOfRange(255)) {
+            try ABI.decodeDecimals(Self.slot("ff"))
+        }
+    }
+}
+
+@Suite("Token amounts")
+struct TokenAmountTests {
+
+    @Test("Scales by the token's own decimals, not by 10^18")
+    func scaling() {
+        let usdc = TokenBalance(token: Token.sepolia[0], raw: 1_038_730_007, decimals: 6)
+        #expect(usdc.amount == Decimal(string: "1038.730007")!)
+
+        // The same raw integer read as an 18-decimal token would be off by 10^12.
+        let asEighteen = TokenBalance(token: Token.sepolia[0], raw: 1_038_730_007, decimals: 18)
+        #expect(asEighteen.amount != usdc.amount)
+        #expect(usdc.amount / asEighteen.amount == Decimal(string: "1000000000000")!)
+    }
+
+    @Test("Keeps full precision on an 18-decimal balance")
+    func precision() {
+        let weth = TokenBalance(
+            token: Token.sepolia[2],
+            raw: Decimal(string: "82421895501198212")!,
+            decimals: 18
+        )
+        #expect(weth.amount == Decimal(string: "0.082421895501198212")!)
+    }
+}
