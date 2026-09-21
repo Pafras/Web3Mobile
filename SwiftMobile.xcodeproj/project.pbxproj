@@ -6,6 +6,11 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F280F8D63061055500557BDA /* ReownAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = F280F8D53061055500557BDA /* ReownAppKit */; };
+		F280F8D93061065800557BDA /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F280F8D83061065800557BDA /* CryptoSwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		F28C755D305FDCBE00FE20C3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,9 +26,22 @@
 		F28C7559305FDCBE00FE20C3 /* SwiftMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F280F8DC30610A3300557BDA /* Exceptions for "SwiftMobile" folder in "SwiftMobile" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F28C750B305FD48300FE20C3 /* SwiftMobile */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F28C750E305FD48300FE20C3 /* SwiftMobile */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F280F8DC30610A3300557BDA /* Exceptions for "SwiftMobile" folder in "SwiftMobile" target */,
+			);
 			path = SwiftMobile;
 			sourceTree = "<group>";
 		};
@@ -38,6 +56,8 @@
 		F28C7509305FD48300FE20C3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				F280F8D63061055500557BDA /* ReownAppKit in Frameworks */,
+				F280F8D93061065800557BDA /* CryptoSwift in Frameworks */,
 			);
 		};
 		F28C7556305FDCBE00FE20C3 /* Frameworks */ = {
@@ -83,6 +103,10 @@
 				F28C750E305FD48300FE20C3 /* SwiftMobile */,
 			);
 			name = SwiftMobile;
+			packageProductDependencies = (
+				F280F8D53061055500557BDA /* ReownAppKit */,
+				F280F8D83061065800557BDA /* CryptoSwift */,
+			);
 			productName = SwiftMobile;
 			productReference = F28C750C305FD48300FE20C3 /* SwiftMobile.app */;
 			productType = "com.apple.product-type.application";
@@ -136,6 +160,10 @@
 			);
 			mainGroup = F28C7503305FD48300FE20C3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F280F8D43061055500557BDA /* XCRemoteSwiftPackageReference "reown-swift" */,
+				F280F8D73061065800557BDA /* XCRemoteSwiftPackageReference "CryptoSwift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F28C750D305FD48300FE20C3 /* Products */;
 			projectDirPath = "";
@@ -308,11 +336,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SwiftMobile/SwiftMobile.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GDPL2X32L7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwiftMobile/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -326,6 +356,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pafrasvio.SwiftMobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -341,11 +372,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SwiftMobile/SwiftMobile.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GDPL2X32L7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwiftMobile/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -359,6 +392,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pafrasvio.SwiftMobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -441,6 +475,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F280F8D43061055500557BDA /* XCRemoteSwiftPackageReference "reown-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/reown-com/reown-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.0;
+			};
+		};
+		F280F8D73061065800557BDA /* XCRemoteSwiftPackageReference "CryptoSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/krzyzanowskim/CryptoSwift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F280F8D53061055500557BDA /* ReownAppKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F280F8D43061055500557BDA /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownAppKit;
+		};
+		F280F8D83061065800557BDA /* CryptoSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F280F8D73061065800557BDA /* XCRemoteSwiftPackageReference "CryptoSwift" */;
+			productName = CryptoSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F28C7504305FD48300FE20C3 /* Project object */;
 	validationLevel = 1;

@@ -1,11 +1,23 @@
+import ReownAppKit
 import SwiftUI
 
 struct BalanceView: View {
     @State private var viewModel = BalanceViewModel()
+    private var wallet = WalletService.shared
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Wallet") {
+                    AppKitButton()
+                    if let address = wallet.address {
+                        Button("Use connected address") {
+                            viewModel.address = address
+                            Task { await viewModel.load() }
+                        }
+                    }
+                }
+
                 Section("Address") {
                     TextField("0x...", text: $viewModel.address)
                         .font(.system(.body, design: .monospaced))
