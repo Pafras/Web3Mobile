@@ -42,6 +42,13 @@ enum EthUnits {
         eth(fromWei: try wei(fromHex: hex))
     }
 
+    /// Encodes text as a hex string. `personal_sign` takes its message this
+    /// way rather than as plain text, so that bytes survive transport
+    /// unambiguously.
+    static func hexString(fromUTF8 text: String) -> String {
+        "0x" + text.utf8.map { String(format: "%02x", $0) }.joined()
+    }
+
     /// An EVM address is "0x" plus exactly 40 hex characters.
     /// ponytail: no EIP-55 checksum validation — add it when the app starts
     /// accepting addresses typed by the user rather than pasted ones.

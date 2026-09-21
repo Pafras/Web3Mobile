@@ -205,3 +205,29 @@ struct TokenAmountTests {
         #expect(weth.amount == Decimal(string: "0.082421895501198212")!)
     }
 }
+
+@Suite("personal_sign encoding")
+struct PersonalSignTests {
+
+    @Test("Encodes the message as hex, matching Reown's own test vector")
+    func matchesReferenceVector() {
+        // Taken from the official reown-swift example app.
+        let message = "My email is john@doe.com - 1653393755151"
+        let expected = "0x4d7920656d61696c206973206a6f686e40646f652e636f6d202d2031363533333933373535313531"
+        #expect(EthUnits.hexString(fromUTF8: message) == expected)
+    }
+
+    @Test("Pads every byte to two hex digits")
+    func padsBytes() {
+        // A newline is 0x0a: without padding it would encode as "a" and shift
+        // every following byte, producing a different message entirely.
+        #expect(EthUnits.hexString(fromUTF8: "\n") == "0x0a")
+        #expect(EthUnits.hexString(fromUTF8: "A") == "0x41")
+    }
+
+    @Test("Handles multi-byte characters")
+    func handlesUnicode() {
+        #expect(EthUnits.hexString(fromUTF8: "é") == "0xc3a9")
+        #expect(EthUnits.hexString(fromUTF8: "") == "0x")
+    }
+}

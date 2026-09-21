@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import WalletConnectRelay
 
 /// `WebSocketConnecting` implemented on URLSessionWebSocketTask.
@@ -6,6 +7,10 @@ import WalletConnectRelay
 /// Reown's SDK ships only the protocol; the official example satisfies it with
 /// Starscream. URLSessionWebSocketTask is part of Foundation and covers every
 /// member of the protocol, so no third-party socket library is needed.
+///
+/// Callers re-enter: the SDK's connection handler reacts to `onDisconnect` by
+/// calling `connect()` again. Every callback is therefore invoked *outside* the
+/// lock, and no method ever blocks waiting on another.
 final class URLSessionWebSocket: NSObject, WebSocketConnecting {
 
     var request: URLRequest
@@ -20,7 +25,8 @@ final class URLSessionWebSocket: NSObject, WebSocketConnecting {
     private var task: URLSessionWebSocketTask?
     private var pingTimer: DispatchSourceTimer?
 
-    private let queue = DispatchQueue(label: "com.pafrasvio.SwiftMobile.websocket")
+    private let timerQueue = DispatchQueue(label: "com.pafrasvio.SwiftMobile.websocket.ping")
+    private let log = Logger(subsystem: "com.pafrasvio.SwiftMobile", category: "socket")
 
     var isConnected: Bool {
         lock.lock()
@@ -34,39 +40,44 @@ final class URLSessionWebSocket: NSObject, WebSocketConnecting {
     }
 
     func connect() {
-        queue.sync {
-            guard task == nil else { return }
-            // A fresh session per connection: URLSession retains its delegate
-            // until invalidated, and invalidating is what breaks that cycle.
-            let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
-            let task = session.webSocketTask(with: request)
-            self.session = session
-            self.task = task
-            task.resume()
-            receiveNext()
+        log.info("SOCK connect requested url=\(self.request.url?.absoluteString ?? "nil", privacy: .public)")
+
+        lock.lock()
+        guard task == nil else {
+            lock.unlock()
+            log.info("SOCK already connecting or connected")
+            return
         }
+        // A fresh session per connection: URLSession retains its delegate until
+        // invalidated, and invalidating is what breaks that cycle.
+        let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+        let task = session.webSocketTask(with: request)
+        self.session = session
+        self.task = task
+        lock.unlock()
+
+        task.resume()
+        receive(on: task)
     }
 
     func disconnect() {
-        queue.sync {
-            stopPinging()
-            task?.cancel(with: .goingAway, reason: nil)
-            task = nil
-            session?.invalidateAndCancel()
-            session = nil
-            setConnected(false)
-        }
+        log.info("SOCK disconnect requested")
+        guard let (task, session) = takeConnection() else { return }
+        task.cancel(with: .goingAway, reason: nil)
+        session.invalidateAndCancel()
     }
 
     func write(string: String, completion: (() -> Void)?) {
-        queue.async { [weak self] in
-            guard let task = self?.task else { return }
-            task.send(.string(string)) { error in
-                if let error {
-                    self?.fail(error)
-                } else {
-                    completion?()
-                }
+        lock.lock()
+        let task = self.task
+        lock.unlock()
+
+        guard let task else { return }
+        task.send(.string(string)) { [weak self] error in
+            if let error {
+                self?.fail(error)
+            } else {
+                completion?()
             }
         }
     }
@@ -75,8 +86,8 @@ final class URLSessionWebSocket: NSObject, WebSocketConnecting {
 
     /// URLSessionWebSocketTask delivers one message per `receive` call, so the
     /// call has to be re-armed after every message.
-    private func receiveNext() {
-        task?.receive { [weak self] result in
+    private func receive(on task: URLSessionWebSocketTask) {
+        task.receive { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(let message):
@@ -90,23 +101,39 @@ final class URLSessionWebSocket: NSObject, WebSocketConnecting {
                 @unknown default:
                     break
                 }
-                self.receiveNext()
+                self.receive(on: task)
             case .failure(let error):
                 self.fail(error)
             }
         }
     }
 
-    private func fail(_ error: Error) {
-        queue.async { [weak self] in
-            guard let self, self.task != nil else { return }
-            self.stopPinging()
-            self.task = nil
-            self.session?.invalidateAndCancel()
-            self.session = nil
-            self.setConnected(false)
-            self.onDisconnect?(error)
+    // MARK: - Teardown
+
+    /// Clears the connection state and hands back what needs tearing down, or
+    /// nil if another path got there first. Keeps teardown to one winner.
+    private func takeConnection() -> (URLSessionWebSocketTask, URLSession)? {
+        lock.lock()
+        guard let task, let session else {
+            lock.unlock()
+            return nil
         }
+        self.task = nil
+        self.session = nil
+        connected = false
+        lock.unlock()
+
+        stopPinging()
+        return (task, session)
+    }
+
+    private func fail(_ error: Error) {
+        log.error("SOCK failed: \(String(describing: error), privacy: .public)")
+        guard let (task, session) = takeConnection() else { return }
+        task.cancel(with: .abnormalClosure, reason: nil)
+        session.invalidateAndCancel()
+        // Called with no lock held: the SDK reconnects from inside this.
+        onDisconnect?(error)
     }
 
     // MARK: - Keepalive
@@ -115,26 +142,31 @@ final class URLSessionWebSocket: NSObject, WebSocketConnecting {
     /// exactly what NATs and carrier networks drop. A periodic ping keeps it up.
     /// ponytail: 15s is a guess that works — tune it if disconnects show up.
     private func startPinging() {
-        let timer = DispatchSource.makeTimerSource(queue: queue)
+        let timer = DispatchSource.makeTimerSource(queue: timerQueue)
         timer.schedule(deadline: .now() + 15, repeating: 15)
         timer.setEventHandler { [weak self] in
-            self?.task?.sendPing { error in
-                if let error { self?.fail(error) }
+            guard let self else { return }
+            self.lock.lock()
+            let task = self.task
+            self.lock.unlock()
+            task?.sendPing { error in
+                if let error { self.fail(error) }
             }
         }
         timer.resume()
+
+        lock.lock()
+        pingTimer?.cancel()
         pingTimer = timer
+        lock.unlock()
     }
 
     private func stopPinging() {
-        pingTimer?.cancel()
-        pingTimer = nil
-    }
-
-    private func setConnected(_ value: Bool) {
         lock.lock()
-        connected = value
+        let timer = pingTimer
+        pingTimer = nil
         lock.unlock()
+        timer?.cancel()
     }
 }
 
@@ -147,11 +179,14 @@ extension URLSessionWebSocket: URLSessionWebSocketDelegate {
         webSocketTask: URLSessionWebSocketTask,
         didOpenWithProtocol proto: String?
     ) {
-        queue.async { [weak self] in
-            self?.setConnected(true)
-            self?.startPinging()
-            self?.onConnect?()
-        }
+        log.info("SOCK opened, protocol=\(proto ?? "none", privacy: .public)")
+        lock.lock()
+        connected = true
+        lock.unlock()
+
+        startPinging()
+        // Called with no lock held: the SDK publishes queued messages here.
+        onConnect?()
     }
 
     func urlSession(
@@ -160,13 +195,10 @@ extension URLSessionWebSocket: URLSessionWebSocketDelegate {
         didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
         reason: Data?
     ) {
-        queue.async { [weak self] in
-            guard let self, self.task != nil else { return }
-            self.stopPinging()
-            self.task = nil
-            self.setConnected(false)
-            self.onDisconnect?(nil)
-        }
+        log.info("SOCK closed code=\(closeCode.rawValue)")
+        guard let (_, session) = takeConnection() else { return }
+        session.invalidateAndCancel()
+        onDisconnect?(nil)
     }
 }
 
